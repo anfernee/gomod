@@ -5,9 +5,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/anfernee/gomod/pkg/module"
 	"golang.org/x/mod/modfile"
+)
+
+const (
+	commentIgnore = "gomod:ignore"
 )
 
 var (
@@ -42,6 +47,10 @@ func main() {
 			continue
 		}
 
+		if ignoreModule(require) {
+			continue
+		}
+
 		m := module.New(require.Mod.Path)
 		latest, err := m.Latest()
 		if err != nil {
@@ -62,4 +71,15 @@ func main() {
 	if err := os.WriteFile(gomod, data, 0644); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func ignoreModule(require *modfile.Require) bool {
+	if require.Syntax.Before != nil {
+		for _, comment := range require.Syntax.Before {
+			if strings.Trim(comment.Token, "/ ") == commentIgnore {
+				return true
+			}
+		}
+	}
+	return false
 }
