@@ -9,10 +9,15 @@ import (
 
 	"github.com/anfernee/gomod/pkg/module"
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/semver"
 )
 
 const (
+	// Ignore this module
 	commentIgnore = "gomod:ignore"
+
+	// Only allow patch version updates
+	commentPatchOnly = "gomod:patch-only"
 )
 
 var (
@@ -52,10 +57,27 @@ func main() {
 		}
 
 		m := module.New(require.Mod.Path)
-		latest, err := m.Latest()
-		if err != nil {
-			log.Printf("failed to load %s: %v", require.Mod.Path, err)
-			continue
+
+		var (
+			latest string
+			err    error
+		)
+
+		if patchOnlyModule(require) {
+			versions, err := m.Versions()
+			if err != nil {
+				log.Printf("failed to get versions for %s: %v", require.Mod.Path, err)
+				continue
+			}
+
+			latest = latestPatch(require.Mod.Version, versions)
+
+		} else {
+			latest, err = m.Latest()
+			if err != nil {
+				log.Printf("failed to get latest version for %s: %v", require.Mod.Path, err)
+				continue
+			}
 		}
 
 		if require.Mod.Version != latest {
@@ -82,4 +104,26 @@ func ignoreModule(require *modfile.Require) bool {
 		}
 	}
 	return false
+}
+
+func patchOnlyModule(require *modfile.Require) bool {
+	if require.Syntax.Before != nil {
+		for _, comment := range require.Syntax.Before {
+			if strings.Trim(comment.Token, "/ ") == commentPatchOnly {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func latestPatch(current string, versions []string) string {
+	cur := semver.MajorMinor(current)
+	latest := current
+	for _, version := range versions {
+		if semver.MajorMinor(version) == cur && semver.Compare(version, latest) > 0 {
+			latest = version
+		}
+	}
+	return latest
 }
