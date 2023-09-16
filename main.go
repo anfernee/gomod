@@ -21,7 +21,8 @@ const (
 )
 
 var (
-	dir = flag.String("dir", ".", "directory to golang project")
+	dir       = flag.String("dir", ".", "directory to golang project")
+	allowBeta = flag.Bool("allow-beta", false, "allow beta versions")
 )
 
 func main() {
@@ -122,7 +123,9 @@ func latestPatch(current string, versions []string) string {
 	latest := current
 	for _, version := range versions {
 		if semver.MajorMinor(version) == cur && semver.Compare(version, latest) > 0 {
-			latest = version
+			if *allowBeta || semver.Prerelease(version) == "" {
+				latest = version
+			}
 		}
 	}
 	return latest
